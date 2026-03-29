@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Qbob</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root {
+  --ease: cubic-bezier(.16,1,.3,1);
+  --spring: cubic-bezier(.34,1.56,.64,1);
+}
+
+[data-theme="dark"] {
+  --bg:#080809; --surface:#0f0f12; --surface2:#161619; --surface3:#1d1d21;
+  --border:rgba(255,255,255,.06); --border2:rgba(255,255,255,.10);
+  --text:#ececf1; --text2:#7a7a8c; --text3:#44444f;
+  --accent:#6e6ef5; --accent-h:#5555e0;
+  --red:#f05050; --green:#30d46a; --yellow:#f5a623;
+  --msg-bot:#111115; --msg-user:#6e6ef5;
+  --sh:0 4px 24px rgba(0,0,0,.5); --sh-sm:0 2px 8px rgba(0,0,0,.35);
+}
+[data-theme="light"] {
+  --bg:#f2f2f6; --surface:#ffffff; --surface2:#f7f7fb; --surface3:#ececf2;
+  --border:rgba(0,0,0,.07); --border2:rgba(0,0,0,.11);
+  --text:#0c0c10; --text2:#6b6b7a; --text3:#b0b0bc;
+  --accent:#5555e0; --accent-h:#4444cc;
+  --red:#e53535; --green:#22bb55; --yellow:#e09820;
+  --msg-bot:#ffffff; --msg-user:#5555e0;
+  --sh:0 4px 24px rgba(0,0,0,.08); --sh-sm:0 2px 8px rgba(0,0,0,.06);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;}
+body{display:flex;justify-content:center;}
+.app{width:min(430px,100vw);height:100dvh;display:flex;flex-direction:column;position:relative;background:var(--bg);overflow:hidden;}
+
+/* ── AUTH ── */
+.auth-screen{
+  position:fixed;inset:0;z-index:200;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.auth-screen.hidden{display:none;}
+.auth-card{
+  width:100%;max-width:360px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:28px 24px;box-shadow:var(--sh);
+}
+.auth-logo{
+  width:48px;height:48px;border-radius:13px;background:var(--accent);
+  display:grid;place-items:center;font-size:20px;font-weight:800;color:white;
+  margin-bottom:16px;
+}
+.auth-title{font-size:20px;font-weight:800;margin-bottom:4px;}
+.auth-sub{font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.4;}
+.auth-tabs{
+  display:flex;gap:4px;background:var(--surface2);
+  border-radius:10px;padding:3px;margin-bottom:18px;
+}
+.auth-tab{
+  flex:1;padding:7px;border:none;background:transparent;color:var(--text2);
+  font:600 13px 'Syne',sans-serif;border-radius:8px;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.auth-tab.active{background:var(--surface);color:var(--text);box-shadow:var(--sh-sm);}
+.auth-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.auth-label{font-size:12px;font-weight:600;color:var(--text2);}
+.auth-input{
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:10px;padding:10px 12px;color:var(--text);
+  font:400 14px 'Syne',sans-serif;outline:none;
+  transition:border-color .15s;width:100%;
+}
+.auth-input:focus{border-color:var(--accent);}
+.auth-input::placeholder{color:var(--text3);}
+.auth-btn{
+  width:100%;padding:12px;border-radius:11px;border:none;
+  background:var(--accent);color:white;
+  font:700 14px 'Syne',sans-serif;cursor:pointer;margin-top:4px;
+  transition:background .15s,transform .1s;
+}
+.auth-btn:hover{background:var(--accent-h);}
+.auth-btn:active{transform:scale(.98);}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed;}
+.auth-msg{font-size:12px;margin-top:10px;text-align:center;min-height:18px;line-height:1.4;}
+.auth-msg.err{color:var(--red);}
+.auth-msg.ok{color:var(--green);}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:10px;padding:10px 16px;
+  font-size:13px;color:var(--text);
+  box-shadow:var(--sh);z-index:300;
+  white-space:nowrap;pointer-events:none;
+  animation:toastPop .2s var(--ease) both;
+}
+.toast.hidden{display:none;}
+@keyframes toastPop{
+  from{opacity:0;transform:translateX(-50%) translateY(8px);}
+  to{opacity:1;transform:translateX(-50%) translateY(0);}
+}
+
+/* ── SIDEBAR ── */
+.sidebar{position:absolute;inset:0;z-index:100;display:flex;transform:translateX(-100%);transition:transform .3s var(--ease);will-change:transform;}
+.sidebar.open{transform:translateX(0);}
+.sb-panel{width:72%;max-width:280px;background:var(--surface);border-right:1px solid var(--border2);display:flex;flex-direction:column;box-shadow:var(--sh);padding-top:max(env(safe-area-inset-top),0px);}
+.sb-overlay{flex:1;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+.sb-top{padding:18px 14px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.sb-label{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;}
+.btn-new{display:flex;align-items:center;gap:5px;padding:0 11px;height:28px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--text2);font:600 12px 'Syne',sans-serif;cursor:pointer;transition:background .15s,color .15s;}
+.btn-new:hover{background:var(--surface3);color:var(--text);}
+.chat-list{flex:1;overflow-y:auto;padding:6px;scrollbar-width:none;}
+.chat-list::-webkit-scrollbar{display:none;}
+.chat-item{padding:9px 10px;border-radius:9px;cursor:pointer;transition:background .15s;margin-bottom:1px;display:flex;align-items:center;gap:8px;}
+.chat-item:hover{background:var(--surface3);}
+.chat-item.active{background:var(--surface3);}
+.chat-item-info{flex:1;min-width:0;}
+.chat-item-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-item-date{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-top:2px;}
+.chat-del{width:24px;height:24px;border-radius:6px;border:none;background:transparent;color:var(--text3);cursor:pointer;display:grid;place-items:center;font-size:14px;opacity:0;transition:opacity .15s,background .15s,color .15s;flex-shrink:0;}
+.chat-item:hover .chat-del{opacity:1;}
+.chat-del:hover{background:rgba(240,80,80,.12);color:var(--red);}
+.sb-foot{padding:8px 6px;border-top:1px solid var(--border);}
+.sb-foot-btn{width:100%;padding:9px 11px;border-radius:9px;border:none;background:transparent;color:var(--text2);font:500 13px 'Syne',sans-serif;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;transition:background .15s,color .15s;}
+.sb-foot-btn:hover{background:var(--surface3);color:var(--text);}
+.sb-logout{color:var(--red) !important;}
+.sb-logout:hover{background:rgba(240,80,80,.08) !important;}
+
+/* ── SETTINGS ── */
+.settings{position:absolute;inset:0;z-index:110;background:var(--surface);transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column;padding-top:max(env(safe-area-inset-top),0px);}
+.settings.open{transform:translateX(0);}
+.set-head{padding:14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+.btn-back{width:32px;height:32px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:15px;cursor:pointer;display:grid;place-items:center;transition:background .15s;}
+.btn-back:hover{background:var(--surface3);}
+.set-title{font-size:16px;font-weight:700;}
+.set-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:20px;scrollbar-width:none;}
+.set-body::-webkit-scrollbar{display:none;}
+.set-group-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-radius:11px;background:var(--surface2);border:1px solid var(--border);margin-bottom:5px;}
+.set-row-main{font-size:14px;font-weight:600;}
+.set-row-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.tog{width:40px;height:22px;border-radius:999px;background:var(--border2);position:relative;cursor:pointer;border:none;flex-shrink:0;transition:background .2s;}
+.tog.on{background:var(--accent);}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:white;transition:transform .2s var(--spring);box-shadow:0 1px 3px rgba(0,0,0,.25);}
+.tog.on::after{transform:translateX(18px);}
+.set-select{background:var(--surface3);border:1px solid var(--border2);color:var(--text);font:500 12px 'Syne',sans-serif;padding:5px 8px;border-radius:8px;cursor:pointer;outline:none;}
+.api-inp{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;margin-bottom:6px;color:var(--text);font:400 13px 'JetBrains Mono',monospace;outline:none;transition:border-color .15s;}
+.api-inp:focus{border-color:var(--accent);}
+.api-inp::placeholder{color:var(--text3);}
+.set-info{font-size:11px;color:var(--text3);padding:0 2px;line-height:1.5;}
+.lim-stat{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.lim-stat-cell{padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:11px;}
+.lim-stat-lbl{font-size:11px;color:var(--text3);margin-bottom:3px;}
+.lim-stat-val{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);}
+.danger-btn{width:100%;padding:11px 13px;border-radius:11px;background:rgba(240,80,80,.08);border:1px solid rgba(240,80,80,.18);color:var(--red);font:600 13px 'Syne',sans-serif;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;transition:background .15s;margin-bottom:6px;}
+.danger-btn:hover{background:rgba(240,80,80,.15);}
+
+/* ── HEADER ── */
+.header{padding:max(env(safe-area-inset-top),0px) 12px 0;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.header-inner{display:flex;align-items:center;justify-content:space-between;padding:10px 0;}
+.h-left,.h-right{display:flex;align-items:center;gap:7px;}
+.ico-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;display:grid;place-items:center;font-size:14px;transition:background .15s,color .15s;flex-shrink:0;}
+.ico-btn:hover{background:var(--surface3);color:var(--text);}
+.brand{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--text);}
+.brand-ver{font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text3);background:var(--surface3);border:1px solid var(--border);padding:1px 5px;border-radius:4px;margin-left:-2px;}
+.status-chip{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;transition:background .15s;white-space:nowrap;}
+.status-chip:hover{background:var(--surface3);}
+.s-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.s-dot.busy{background:var(--accent);animation:pulse .8s infinite alternate;}
+@keyframes pulse{from{opacity:1;}to{opacity:.3;}}
+
+/* ── TOAST POPUP ── */
+.pop{position:absolute;top:calc(max(env(safe-area-inset-top),0px) + 58px);left:12px;right:12px;z-index:130;display:none;padding:12px;border-radius:14px;background:var(--surface);border:1px solid var(--border2);box-shadow:var(--sh);backdrop-filter:blur(10px);}
+.pop.open{display:block;animation:toastIn .18s var(--ease) both;}
+@keyframes toastIn{from{opacity:0;transform:translateY(-6px) scale(.99);}to{opacity:1;transform:translateY(0) scale(1);}}
+.pop-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.pop-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--text);}
+.pop-close{width:30px;height:30px;border:1px solid var(--border2);background:transparent;border-radius:10px;color:var(--text2);cursor:pointer;display:grid;place-items:center;font-size:14px;}
+.pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.pop-cell{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;}
+.pop-lbl{font-size:10px;color:var(--text3);margin-bottom:3px;}
+.pop-val{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);}
+.pop-foot{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.pop-bar{flex:1;height:2px;border-radius:999px;background:var(--surface3);overflow:hidden;}
+.pop-bar-f{height:100%;width:0%;border-radius:999px;background:var(--accent);transition:width .4s var(--ease),background .3s;}
+.pop-bar-f.warn{background:var(--yellow);}
+.pop-bar-f.crit{background:var(--red);}
+.pop-note{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap;}
+
+/* ── FEED ── */
+.feed{flex:1;overflow-y:auto;padding:16px 12px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;scroll-behavior:smooth;}
+.feed::-webkit-scrollbar{width:3px;}
+.feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:999px;}
+.thread{display:flex;flex-direction:column;gap:8px;}
+
+/* ── MESSAGES ── */
+.msg-row{display:flex;align-items:flex-end;gap:7px;animation:msgIn .2s var(--ease) both;}
+.msg-row.user{flex-direction:row-reverse;}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.av{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:800;flex-shrink:0;}
+.av.bot{background:var(--accent);color:white;}
+.av.user{background:var(--surface3);border:1px solid var(--border2);color:var(--text2);font-size:12px;}
+.msg-col{display:flex;flex-direction:column;max-width:75%;}
+.msg-row.user .msg-col{align-items:flex-end;}
+.bubble{padding:9px 12px;border-radius:13px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;}
+.msg-row.bot .bubble{background:var(--msg-bot);border:1px solid var(--border2);border-bottom-left-radius:3px;color:var(--text);box-shadow:var(--sh-sm);}
+.msg-row.user .bubble{background:var(--msg-user);border-bottom-right-radius:3px;color:white;}
+.msg-time{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--text3);margin-top:3px;padding:0 2px;}
+.msg-row.user .msg-time{text-align:right;}
+.typing-dots{display:flex;gap:3px;align-items:center;padding:3px 2px;}
+.typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--text3);animation:td 1.2s infinite;}
+.typing-dots span:nth-child(2){animation-delay:.16s;}
+.typing-dots span:nth-child(3){animation-delay:.32s;}
+@keyframes td{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
+
+/* ── EMPTY STATE ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;gap:6px;padding:30px 16px;animation:fadeUp .35s var(--ease) both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.empty-q{width:48px;height:48px;border-radius:13px;background:var(--accent);display:grid;place-items:center;font-size:20px;font-weight:800;color:white;margin-bottom:6px;}
+.empty-hi{font-size:17px;font-weight:700;}
+.empty-sub{font-size:13px;color:var(--text2);text-align:center;line-height:1.5;max-width:220px;}
+.suggestions{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;}
+.sug{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--border2);background:var(--surface2);font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:background .15s,color .15s,border-color .15s,transform .15s var(--spring);}
+.sug:hover{background:var(--accent);color:white;border-color:var(--accent);transform:scale(1.04);}
+
+/* ── LIMITS STRIP ── */
+.lim-strip{padding:5px 12px 4px;flex-shrink:0;display:flex;align-items:center;gap:8px;}
+.lim-txt{font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text3);white-space:nowrap;}
+.bar{flex:1;height:2px;border-radius:999px;background:var(--surface3);overflow:hidden;}
+.bar-f{height:100%;border-radius:999px;background:var(--accent);transition:width .4s var(--ease),background .3s;}
+.bar-f.warn{background:var(--yellow);}
+.bar-f.crit{background:var(--red);}
+
+/* ── COMPOSER ── */
+.composer{padding:8px 10px max(env(safe-area-inset-bottom),10px);background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;position:relative;}
+.inp-wrap{display:flex;align-items:flex-end;gap:6px;background:var(--surface2);border:1px solid var(--border2);border-radius:13px;padding:7px 7px 7px 12px;transition:border-color .2s;}
+.inp-wrap:focus-within{border-color:var(--accent);}
+textarea{flex:1;background:transparent;border:none;outline:none;color:var(--text);font:400 14px 'Syne',sans-serif;line-height:1.5;resize:none;min-height:22px;max-height:100px;overflow-y:auto;scrollbar-width:none;}
+textarea::-webkit-scrollbar{display:none;}
+textarea::placeholder{color:var(--text3);}
+.btn-send{width:32px;height:32px;border-radius:8px;border:none;background:var(--accent);color:white;cursor:pointer;display:grid;place-items:center;flex-shrink:0;font-size:14px;transition:transform .15s var(--spring),background .15s;}
+.btn-send:hover{background:var(--accent-h);}
+.btn-send:active{transform:scale(.88);}
+.btn-send:disabled{opacity:.3;cursor:not-allowed;}
+.btn-send.hidden{display:none;}
+.btn-stop{width:32px;height:32px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;display:none;place-items:center;flex-shrink:0;font-size:11px;font-weight:800;transition:background .15s;}
+.btn-stop.show{display:grid;}
+.btn-stop:hover{background:var(--surface3);}
+.c-hint{text-align:center;font-size:10px;color:var(--text3);margin-top:6px;line-height:1.4;}
+.c-hint a{color:var(--text3);cursor:pointer;text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<!-- ── TOAST ── -->
+<div class="toast hidden" id="toast"></div>
+
+<!-- ── AUTH SCREEN ── -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">Q</div>
+    <div class="auth-title">Qbob</div>
+    <div class="auth-sub">Увійди або створи акаунт щоб почати</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin">Увійти</button>
+      <button class="auth-tab" id="tabRegister">Реєстрація</button>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" autocomplete="email"/>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Пароль</label>
+      <input class="auth-input" type="password" id="authPassword" placeholder="Мінімум 6 символів" autocomplete="current-password"/>
+    </div>
+    <button class="auth-btn" id="authSubmit">Увійти</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- ── SIDEBAR ── -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-panel">
+    <div class="sb-top">
+      <span class="sb-label">Чати</span>
+      <button class="btn-new" id="btnNew">+ Новий</button>
+    </div>
+    <div class="chat-list" id="chatList"></div>
+    <div class="sb-foot">
+      <button class="sb-foot-btn" id="btnSbSettings">⚙ Налаштування</button>
+      <button class="sb-foot-btn sb-logout" id="btnLogout">↪ Вийти</button>
+    </div>
+  </div>
+  <div class="sb-overlay" id="sbOverlay"></div>
+</div>
+
+<!-- ── SETTINGS ── -->
+<div class="settings" id="settings">
+  <div class="set-head">
+    <button class="btn-back" id="btnBack">←</button>
+    <span class="set-title">Налаштування</span>
+  </div>
+  <div class="set-body">
+    <div>
+      <div class="set-group-title">Вигляд</div>
+      <div class="set-row">
+        <div><div class="set-row-main">Темна тема</div></div>
+        <button class="tog on" id="togTheme"></button>
+      </div>
+    </div>
+    <div>
+      <div class="set-group-title">Асистент</div>
+      <div class="set-row">
+        <div><div class="set-row-main">Стиль</div></div>
+        <select class="set-select" id="selStyle">
+          <option value="friendly">Дружній</option>
+          <option value="neutral">Нейтральний</option>
+          <option value="pro">Професійний</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div><div class="set-row-main">Мова відповіді</div></div>
+        <select class="set-select" id="selLang">
+          <option value="auto">Авто</option>
+          <option value="uk">Українська</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <div class="set-group-title">Свій API ключ (знімає ліміти)</div>
+      <input class="api-inp" type="password" id="inpGemini" placeholder="Gemini API key..."/>
+      <input class="api-inp" type="password" id="inpGroq" placeholder="Groq API key (запасний)..."/>
+      <div class="set-info">Свій ключ не витрачає спільний банк і знімає денні ліміти.</div>
+    </div>
+    <div>
+      <div class="set-group-title">Ліміти сьогодні</div>
+      <div class="lim-stat">
+        <div class="lim-stat-cell"><div class="lim-stat-lbl">Використано</div><div class="lim-stat-val" id="setUsed">0</div></div>
+        <div class="lim-stat-cell"><div class="lim-stat-lbl">Залишилось</div><div class="lim-stat-val" id="setLeft" style="color:var(--accent)">30</div></div>
+        <div class="lim-stat-cell"><div class="lim-stat-lbl">Гарантовано</div><div class="lim-stat-val">10</div></div>
+        <div class="lim-stat-cell"><div class="lim-stat-lbl">Скидання</div><div class="lim-stat-val" id="setReset" style="font-size:12px">--:--</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="set-group-title">Акаунт</div>
+      <div class="set-row">
+        <div><div class="set-row-main">Email</div></div>
+        <span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace" id="setEmail">—</span>
+      </div>
+    </div>
+    <div>
+      <div class="set-group-title">Небезпечна зона</div>
+      <button class="danger-btn" id="btnClear">🗑 Очистити всі чати</button>
+      <button class="danger-btn" id="btnLogout2">↪ Вийти з акаунту</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── HEADER ── -->
+<header class="header">
+  <div class="header-inner">
+    <div class="h-left">
+      <button class="ico-btn" id="btnMenu">☰</button>
+      <div class="brand">Qbob</div>
+      <span class="brand-ver">v1.0</span>
+    </div>
+    <div class="h-right">
+      <div class="status-chip" id="statusChip">
+        <span class="s-dot" id="sDot"></span>
+        <span id="sText">Онлайн</span>
+      </div>
+      <button class="ico-btn" id="btnSettings">⚙</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── LIMITS POPUP ── -->
+<div class="pop" id="pop">
+  <div class="pop-head">
+    <div class="pop-title">ℹ Ліміти</div>
+    <button class="pop-close" id="popClose">✕</button>
+  </div>
+  <div class="pop-grid">
+    <div class="pop-cell"><div class="pop-lbl">Запити</div><div class="pop-val" id="popUsage">0 / 30</div></div>
+    <div class="pop-cell"><div class="pop-lbl">Модель</div><div class="pop-val" id="popModel">Gemini</div></div>
+    <div class="pop-cell"><div class="pop-lbl">Сесія</div><div class="pop-val" id="popSess">0 хв</div></div>
+    <div class="pop-cell"><div class="pop-lbl">Скидання</div><div class="pop-val" id="popReset" style="font-size:12px">--:--</div></div>
+  </div>
+  <div class="pop-foot">
+    <div class="pop-bar"><div class="pop-bar-f" id="popBarF"></div></div>
+    <div class="pop-note" id="popNote">Онлайн</div>
+  </div>
+</div>
+
+<!-- ── FEED ── -->
+<div class="feed" id="feed">
+  <div class="thread" id="thread"></div>
+</div>
+
+<!-- ── LIMITS STRIP ── -->
+<div class="lim-strip">
+  <span class="lim-txt" id="limTxt">0 / 30</span>
+  <div class="bar"><div class="bar-f" id="barF" style="width:0%"></div></div>
+  <span class="lim-txt" id="limReset">↺ --:--</span>
+</div>
+
+<!-- ── COMPOSER ── -->
+<div class="composer">
+  <div class="inp-wrap">
+    <textarea id="msgTa" rows="1" placeholder="Напиши повідомлення..."></textarea>
+    <button class="btn-stop" id="btnStop">■</button>
+    <button class="btn-send" id="btnSend">➤</button>
+  </div>
+  <div class="c-hint">Qbob може помилятися · <a id="limLink">ліміти</a></div>
+</div>
+
+</div><!-- .app -->
+
+<script>
+// ════════════════════════════════════════════════
+//  КОНФІГ — замінити після створення Supabase проекту
+// ════════════════════════════════════════════════
+const SUPABASE_URL  = 'https://ftcoegawsudenasztghe.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0Y29lZ2F3c3VkZW5hc3p0Z2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MzAxODgsImV4cCI6MjA5MDMwNjE4OH0.3gE-LrxAGsTsl6Z5S-ZxVD1MCSMarzCkD_8Lg-qFQPI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ════════════════════════════════════════════════
+//  СТАН
+// ════════════════════════════════════════════════
+const MAX = 30;
+const STORAGE_KEY = 'qbob_v3';
+const sessStart = Date.now();
+
+function defaultState() {
+  return {
+    theme: 'dark', style: 'friendly', lang: 'auto',
+    geminiKey: '', groqKey: '',
+    usage: 0, usageDate: todayStr(),
+    chats: [], token: null, userId: null, userEmail: null
+  };
+}
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return s ? Object.assign(defaultState(), s) : defaultState();
+  } catch { return defaultState(); }
+}
+
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+let state = loadState();
+let activeId = null, isThinking = false, stopReq = false, thinkRow = null;
+
+// Скидаємо лічильник якщо новий день
+if (state.usageDate !== todayStr()) {
+  state.usage = 0;
+  state.usageDate = todayStr();
+  saveState();
+}
+
+// ════════════════════════════════════════════════
+//  ЕЛЕМЕНТИ
+// ════════════════════════════════════════════════
+const feed     = document.getElementById('feed');
+const thread   = document.getElementById('thread');
+const msgTa    = document.getElementById('msgTa');
+const btnSend  = document.getElementById('btnSend');
+const btnStop  = document.getElementById('btnStop');
+const sDot     = document.getElementById('sDot');
+const sText    = document.getElementById('sText');
+const barF     = document.getElementById('barF');
+const limTxt   = document.getElementById('limTxt');
+const limReset = document.getElementById('limReset');
+const pop      = document.getElementById('pop');
+const popUsage = document.getElementById('popUsage');
+const popSess  = document.getElementById('popSess');
+const popReset = document.getElementById('popReset');
+const popBarF  = document.getElementById('popBarF');
+const popNote  = document.getElementById('popNote');
+const popClose = document.getElementById('popClose');
+const chatList = document.getElementById('chatList');
+const togTheme = document.getElementById('togTheme');
+const selStyle = document.getElementById('selStyle');
+const selLang  = document.getElementById('selLang');
+const inpGemini= document.getElementById('inpGemini');
+const inpGroq  = document.getElementById('inpGroq');
+const setUsed  = document.getElementById('setUsed');
+const setLeft  = document.getElementById('setLeft');
+const setReset = document.getElementById('setReset');
+const setEmail = document.getElementById('setEmail');
+
+// ════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════
+const toastEl = document.getElementById('toast');
+let toastTmr = null;
+function showToast(msg, dur = 2500) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove('hidden');
+  toastEl.style.animation = 'none';
+  requestAnimationFrame(() => { toastEl.style.animation = ''; });
+  clearTimeout(toastTmr);
+  toastTmr = setTimeout(() => toastEl.classList.add('hidden'), dur);
+}
+
+// ════════════════════════════════════════════════
+//  ТЕМА
+// ════════════════════════════════════════════════
+function applyTheme(t) {
+  state.theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  togTheme.classList.toggle('on', t === 'dark');
+  saveState();
+}
+togTheme.addEventListener('click', () => applyTheme(state.theme === 'dark' ? 'light' : 'dark'));
+applyTheme(state.theme);
+
+// ════════════════════════════════════════════════
+//  НАЛАШТУВАННЯ
+// ════════════════════════════════════════════════
+function syncSettingsUI() {
+  selStyle.value = state.style;
+  selLang.value  = state.lang;
+  inpGemini.value = state.geminiKey;
+  inpGroq.value   = state.groqKey;
+  setEmail.textContent = state.userEmail || '—';
+  updateLimitsUI();
+}
+
+selStyle.addEventListener('change', () => { state.style = selStyle.value; saveState(); syncProfileToServer(); });
+selLang.addEventListener('change',  () => { state.lang  = selLang.value;  saveState(); syncProfileToServer(); });
+inpGemini.addEventListener('input', () => { state.geminiKey = inpGemini.value; saveState(); updateLimitsUI(); });
+inpGroq.addEventListener('input',   () => { state.groqKey   = inpGroq.value;   saveState(); });
+
+async function syncProfileToServer() {
+  if (!state.token || !state.userId) return;
+  try {
+    await sb.from('profiles').upsert({
+      id: state.userId,
+      style: state.style,
+      lang: state.lang,
+      own_key_gemini: state.geminiKey || null,
+      own_key_groq:   state.groqKey   || null
+    }, { onConflict: 'id' });
+  } catch {}
+}
+
+// ════════════════════════════════════════════════
+//  ПАНЕЛІ
+// ════════════════════════════════════════════════
+const sidebar  = document.getElementById('sidebar');
+const settings = document.getElementById('settings');
+
+const openSidebar  = () => sidebar.classList.add('open');
+const closeSidebar = () => sidebar.classList.remove('open');
+const openSettings = () => { syncSettingsUI(); settings.classList.add('open'); };
+const closeSettings= () => settings.classList.remove('open');
+
+document.getElementById('btnMenu').addEventListener('click', openSidebar);
+document.getElementById('sbOverlay').addEventListener('click', closeSidebar);
+document.getElementById('btnSettings').addEventListener('click', openSettings);
+document.getElementById('btnSbSettings').addEventListener('click', () => { closeSidebar(); openSettings(); });
+document.getElementById('btnBack').addEventListener('click', closeSettings);
+
+// ════════════════════════════════════════════════
+//  ЛІМІТИ UI
+// ════════════════════════════════════════════════
+function updateLimitsUI() {
+  const u = state.usage, pct = (u / MAX) * 100;
+  const cls = pct >= 100 ? ' crit' : pct >= 70 ? ' warn' : '';
+  barF.style.width = pct + '%';
+  barF.className = 'bar-f' + cls;
+  limTxt.textContent = u + ' / ' + MAX;
+  popUsage.textContent = u + ' / ' + MAX;
+  popBarF.style.width = pct + '%';
+  popBarF.className = 'pop-bar-f' + cls;
+  setUsed.textContent = u;
+  setLeft.textContent = Math.max(MAX - u, 0);
+  document.getElementById('popModel').textContent = state.geminiKey ? 'Gemini ✓' : 'Gemini';
+  popNote.textContent = (u >= MAX && !state.geminiKey) ? 'Ліміт вичерпано' : 'Онлайн';
+}
+
+function updateTimers() {
+  const now = new Date(), mid = new Date(now);
+  mid.setHours(24, 0, 0, 0);
+  const d = mid - now;
+  const str = `${Math.floor(d/3600000).toString().padStart(2,'0')}:${Math.floor((d%3600000)/60000).toString().padStart(2,'0')}`;
+  limReset.textContent = '↺ ' + str;
+  setReset.textContent = str;
+  popReset.textContent = str;
+  popSess.textContent = Math.floor((Date.now() - sessStart) / 60000) + ' хв';
+}
+setInterval(updateTimers, 30000);
+updateTimers();
+
+// ════════════════════════════════════════════════
+//  POPUP ЛІМІТИ
+// ════════════════════════════════════════════════
+let popTmr = null;
+function showPop() {
+  updateLimitsUI();
+  pop.classList.add('open');
+  clearTimeout(popTmr);
+  popTmr = setTimeout(() => pop.classList.remove('open'), 4000);
+}
+document.getElementById('limLink').addEventListener('click', e => { e.stopPropagation(); showPop(); });
+document.getElementById('statusChip').addEventListener('click', e => { e.stopPropagation(); showPop(); });
+popClose.addEventListener('click', () => { pop.classList.remove('open'); clearTimeout(popTmr); });
+document.addEventListener('click', e => {
+  if (!pop.contains(e.target)) pop.classList.remove('open');
+});
+
+// ════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════
+const authScreen = document.getElementById('authScreen');
+const authEmail  = document.getElementById('authEmail');
+const authPass   = document.getElementById('authPassword');
+const authSubmit = document.getElementById('authSubmit');
+const authMsg    = document.getElementById('authMsg');
+const tabLogin   = document.getElementById('tabLogin');
+const tabReg     = document.getElementById('tabRegister');
+
+let authMode = 'login';
+
+function setAuthMsg(text, type = 'err') {
+  authMsg.textContent = text;
+  authMsg.className = 'auth-msg ' + type;
+}
+
+tabLogin.addEventListener('click', () => {
+  authMode = 'login';
+  tabLogin.classList.add('active');
+  tabReg.classList.remove('active');
+  authSubmit.textContent = 'Увійти';
+  setAuthMsg('');
+});
+
+tabReg.addEventListener('click', () => {
+  authMode = 'register';
+  tabReg.classList.add('active');
+  tabLogin.classList.remove('active');
+  authSubmit.textContent = 'Зареєструватись';
+  setAuthMsg('');
+});
+
+authSubmit.addEventListener('click', async () => {
+  const email = authEmail.value.trim();
+  const password = authPass.value;
+  setAuthMsg('');
+
+  if (!email || !password) { setAuthMsg('Заповни всі поля.'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAuthMsg('Невірний формат email.'); return; }
+  if (password.length < 6) { setAuthMsg('Пароль мінімум 6 символів.'); return; }
+
+  authSubmit.disabled = true;
+  authSubmit.textContent = '...';
+
+  try {
+    let result;
+    if (authMode === 'login') {
+      result = await sb.auth.signInWithPassword({ email, password });
+    } else {
+      result = await sb.auth.signUp({ email, password });
+    }
+
+    if (result.error) {
+      const m = result.error.message;
+      if (m.includes('Invalid login') || m.includes('Invalid email or password')) {
+        setAuthMsg('Невірний email або пароль.');
+      } else if (m.includes('already registered') || m.includes('User already registered')) {
+        setAuthMsg('Цей email вже зареєстрований. Спробуй увійти.');
+      } else if (m.includes('Email not confirmed')) {
+        setAuthMsg('Підтверди email спочатку. Перевір пошту.', 'ok');
+      } else {
+        setAuthMsg(m);
+      }
+      authSubmit.disabled = false;
+      authSubmit.textContent = authMode === 'login' ? 'Увійти' : 'Зареєструватись';
+      return;
+    }
+
+    // Реєстрація без підтвердження email — одразу входить
+    if (authMode === 'register' && result.data.session) {
+      onLoggedIn(result.data.session);
+      return;
+    }
+
+    // Реєстрація з підтвердженням email
+    if (authMode === 'register' && !result.data.session) {
+      setAuthMsg('Перевір пошту — надіслали підтвердження! Після підтвердження увійди.', 'ok');
+      authSubmit.disabled = false;
+      authSubmit.textContent = 'Зареєструватись';
+      return;
+    }
+
+    onLoggedIn(result.data.session);
+
+  } catch (e) {
+    setAuthMsg('Помилка з\'єднання. Перевір інтернет.');
+    authSubmit.disabled = false;
+    authSubmit.textContent = authMode === 'login' ? 'Увійти' : 'Зареєструватись';
+  }
+});
+
+authEmail.addEventListener('keydown', e => { if (e.key === 'Enter') authPass.focus(); });
+authPass.addEventListener('keydown',  e => { if (e.key === 'Enter') authSubmit.click(); });
+
+// Вийти
+async function logout() {
+  await sb.auth.signOut();
+  state.token = null;
+  state.userId = null;
+  state.userEmail = null;
+  saveState();
+  closeSidebar();
+  closeSettings();
+  authScreen.classList.remove('hidden');
+  setAuthMsg('');
+  authSubmit.textContent = 'Увійти';
+  authSubmit.disabled = false;
+  showToast('Вийшов з акаунту');
+}
+
+document.getElementById('btnLogout').addEventListener('click', logout);
+document.getElementById('btnLogout2').addEventListener('click', logout);
+
+// Після логіну
+function onLoggedIn(session) {
+  state.token = session.access_token;
+  state.userId = session.user.id;
+  state.userEmail = session.user.email;
+  saveState();
+  authScreen.classList.add('hidden');
+  syncLimitsFromServer();
+  showToast('Привіт! 👋');
+}
+
+// Синхронізація лімітів і профілю з сервера
+async function syncLimitsFromServer() {
+  if (!state.token || !state.userId) return;
+  try {
+    const { data } = await sb
+      .from('profiles')
+      .select('usage_count, usage_date, style, lang, own_key_gemini, own_key_groq')
+      .eq('id', state.userId)
+      .single();
+
+    if (!data) return;
+
+    const serverToday = data.usage_date;
+    state.usage = (serverToday === todayStr()) ? (data.usage_count || 0) : 0;
+    state.usageDate = todayStr();
+    if (data.style) state.style = data.style;
+    if (data.lang)  state.lang  = data.lang;
+    if (data.own_key_gemini) state.geminiKey = data.own_key_gemini;
+    if (data.own_key_groq)   state.groqKey   = data.own_key_groq;
+
+    saveState();
+    updateLimitsUI();
+  } catch {}
+}
+
+// Перевірка сесії при завантаженні
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    onLoggedIn(session);
+  }
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      state.token = null;
+      state.userId = null;
+      saveState();
+      authScreen.classList.remove('hidden');
+    }
+    if (event === 'TOKEN_REFRESHED' && session) {
+      state.token = session.access_token;
+      saveState();
+    }
+  });
+})();
+
+// ════════════════════════════════════════════════
+//  ЧАТИ
+// ════════════════════════════════════════════════
+function createChat() {
+  const c = { id: Date.now().toString(), title: 'Новий чат', date: new Date().toLocaleDateString('uk'), messages: [] };
+  state.chats.unshift(c);
+  saveState();
+  return c;
+}
+
+function deleteChat(id, e) {
+  e.stopPropagation();
+  if (state.chats.length === 1) {
+    const c = state.chats.find(x => x.id === id);
+    if (c) { c.messages = []; c.title = 'Новий чат'; }
+    saveState(); thread.innerHTML = ''; renderEmpty(); renderList(); return;
+  }
+  state.chats = state.chats.filter(x => x.id !== id);
+  saveState();
+  if (activeId === id) {
+    activeId = null;
+    if (state.chats.length > 0) loadChat(state.chats[0].id);
+    else { thread.innerHTML = ''; renderEmpty(); }
+  }
+  renderList();
+}
+
+function renderList() {
+  chatList.innerHTML = '';
+  if (!state.chats.length) {
+    chatList.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text3)">Немає чатів</div>';
+    return;
+  }
+  state.chats.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'chat-item' + (c.id === activeId ? ' active' : '');
+    const info = document.createElement('div');
+    info.className = 'chat-item-info';
+    info.innerHTML = `<div class="chat-item-title">${esc(c.title)}</div><div class="chat-item-date">${c.date}</div>`;
+    const del = document.createElement('button');
+    del.className = 'chat-del'; del.textContent = '✕'; del.title = 'Видалити';
+    del.addEventListener('click', e => deleteChat(c.id, e));
+    el.append(info, del);
+    el.addEventListener('click', () => { loadChat(c.id); closeSidebar(); });
+    chatList.appendChild(el);
+  });
+}
+
+function loadChat(id) {
+  activeId = id;
+  const c = state.chats.find(x => x.id === id);
+  if (!c) return;
+  thread.innerHTML = '';
+  if (!c.messages.length) renderEmpty();
+  else c.messages.forEach(m => addBubble(m.text, m.role, m.time, false));
+  renderList(); scrollBot();
+}
+
+function getActive() {
+  if (!activeId || !state.chats.find(x => x.id === activeId)) {
+    const c = createChat(); activeId = c.id; renderList(); return c;
+  }
+  return state.chats.find(x => x.id === activeId);
+}
+
+document.getElementById('btnNew').addEventListener('click', () => {
+  const c = createChat(); activeId = c.id;
+  thread.innerHTML = ''; renderEmpty(); renderList(); closeSidebar();
+});
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  if (!confirm('Видалити всі чати? Це незворотно.')) return;
+  state.chats = []; activeId = null; saveState();
+  thread.innerHTML = ''; renderEmpty(); renderList(); closeSettings();
+});
+
+// ════════════════════════════════════════════════
+//  ПОРОЖНІЙ СТАН
+// ════════════════════════════════════════════════
+function renderEmpty() {
+  thread.innerHTML = `
+    <div class="empty">
+      <div class="empty-q">Q</div>
+      <div class="empty-hi">Привіт, я Qbob</div>
+      <div class="empty-sub">Запитай про погоду, новини, курс валют — або просто поговори</div>
+      <div class="suggestions">
+        <div class="sug" data-q="Яка погода в Києві?">🌤 Погода</div>
+        <div class="sug" data-q="Останні новини">📰 Новини</div>
+        <div class="sug" data-q="Курс долара сьогодні">💱 Курс долара</div>
+        <div class="sug" data-q="Що таке штучний інтелект?">🔍 Пошук</div>
+      </div>
+    </div>`;
+  thread.querySelectorAll('.sug').forEach(s =>
+    s.addEventListener('click', () => { msgTa.value = s.dataset.q; handleSend(); })
+  );
+}
+
+// ════════════════════════════════════════════════
+//  ПОВІДОМЛЕННЯ
+// ════════════════════════════════════════════════
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function nowTime() { return new Date().toLocaleTimeString('uk', { hour:'2-digit', minute:'2-digit' }); }
+
+function addBubble(text, role, time, animate = true) {
+  const empty = thread.querySelector('.empty');
+  if (empty) empty.remove();
+
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + role;
+  if (!animate) row.style.animation = 'none';
+
+  const av = document.createElement('div');
+  av.className = 'av ' + role;
+  av.textContent = role === 'bot' ? 'Q' : '👤';
+
+  const col = document.createElement('div');
+  col.className = 'msg-col';
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.textContent = text;
+
+  const t = document.createElement('div');
+  t.className = 'msg-time';
+  t.textContent = time || nowTime();
+
+  col.append(bub, t);
+  row.append(role === 'bot' ? av : col, role === 'bot' ? col : av);
+  thread.appendChild(row);
+  scrollBot();
+  return bub;
+}
+
+function addTypingIndicator() {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  const av = document.createElement('div');
+  av.className = 'av bot'; av.textContent = 'Q';
+  const col = document.createElement('div');
+  col.className = 'msg-col';
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  col.appendChild(bub); row.append(av, col);
+  thread.appendChild(row); scrollBot(); return row;
+}
+
+function scrollBot() { requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; }); }
+
+// ════════════════════════════════════════════════
+//  СТАН ДУМАННЯ
+// ════════════════════════════════════════════════
+function setThinking(val) {
+  isThinking = val;
+  sDot.className = 's-dot' + (val ? ' busy' : '');
+  sText.textContent = val ? 'Думає...' : 'Онлайн';
+  btnSend.classList.toggle('hidden', val);
+  btnStop.classList.toggle('show', val);
+  msgTa.disabled = val;
+}
+
+btnStop.addEventListener('click', () => {
+  stopReq = true;
+  if (thinkRow) { thinkRow.remove(); thinkRow = null; }
+  setThinking(false);
+  addBubble('Зупинено.', 'bot');
+  saveMsg('Зупинено.', 'bot');
+});
+
+function saveMsg(text, role) {
+  const c = getActive();
+  c.messages.push({ text, role, time: nowTime() });
+  if (c.messages.length === 1 && role === 'user') {
+    c.title = text.slice(0, 32) + (text.length > 32 ? '…' : '');
+  }
+  saveState(); renderList();
+}
+
+// ════════════════════════════════════════════════
+//  ВІДПРАВКА — РЕАЛЬНИЙ ВИКЛИК /api/chat
+// ════════════════════════════════════════════════
+const ERR_MAP = {
+  'limit_exceeded':    'Ліміт на сьогодні вичерпано 😔 Повернись завтра або додай свій ключ у налаштуваннях.',
+  'both_models_failed':'Мозок тимчасово недоступний. Спробуй через хвилину.',
+  'pipeline_failed':   'Щось пішло не так. Спробуй ще раз.',
+  'no_ai_keys':        'AI ключі не налаштовані. Зверніться до адміністратора.',
+  'too_fast':          'Надто швидко! Зачекай секунду.',
+};
+
+async function handleSend() {
+  const text = msgTa.value.trim();
+  if (!text || isThinking) return;
+
+  // Перевірка авторизації
+  if (!state.token) {
+    authScreen.classList.remove('hidden');
+    return;
+  }
+
+  // Локальна перевірка лімітів
+  if (!state.geminiKey && state.usage >= MAX) {
+    addBubble(ERR_MAP['limit_exceeded'], 'bot');
+    showPop();
+    return;
+  }
+
+  getActive();
+  const history = getActive().messages.slice(-10).map(m => ({ role: m.role, text: m.text }));
+
+  addBubble(text, 'user');
+  saveMsg(text, 'user');
+  msgTa.value = '';
+  msgTa.style.height = 'auto';
+  stopReq = false;
+  setThinking(true);
+  thinkRow = addTypingIndicator();
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        message: text,
+        history,
+        token: state.token,
+        userKey: { gemini: state.geminiKey || null, groq: state.groqKey || null }
+      })
+    });
+
+    clearTimeout(timeout);
+    if (thinkRow) { thinkRow.remove(); thinkRow = null; }
+    setThinking(false);
+    if (stopReq) return;
+
+    // Токен протух
+    if (res.status === 401) {
+      await sb.auth.signOut();
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const msg = ERR_MAP[data?.error] || 'Щось пішло не так. Спробуй ще раз.';
+      addBubble(msg, 'bot');
+      if (data?.error === 'limit_exceeded') showPop();
+      return;
+    }
+
+    addBubble(data.reply, 'bot');
+    saveMsg(data.reply, 'bot');
+
+    // Оновлюємо лічильник якщо немає свого ключа
+    if (!state.geminiKey) {
+      state.usage = data.usage ?? state.usage + 1;
+      state.usageDate = todayStr();
+      saveState();
+      updateLimitsUI();
+    }
+
+  } catch (err) {
+    if (thinkRow) { thinkRow.remove(); thinkRow = null; }
+    setThinking(false);
+    if (stopReq) return;
+
+    if (err.name === 'AbortError') {
+      addBubble('Qbob думав задовго — спробуй ще раз або перефразуй запит.', 'bot');
+    } else {
+      addBubble('Не вдалося з\'єднатися з сервером. Перевір інтернет.', 'bot');
+    }
+  }
+}
+
+// ════════════════════════════════════════════════
+//  INPUT
+// ════════════════════════════════════════════════
+msgTa.addEventListener('input', () => {
+  msgTa.style.height = 'auto';
+  msgTa.style.height = Math.min(msgTa.scrollHeight, 100) + 'px';
+  scrollBot();
+});
+msgTa.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+btnSend.addEventListener('click', handleSend);
+
+// ════════════════════════════════════════════════
+//  ІНІЦІАЛІЗАЦІЯ
+// ════════════════════════════════════════════════
+if (state.chats.length > 0) loadChat(state.chats[0].id);
+else renderEmpty();
+renderList();
+updateLimitsUI();
+</script>
+</body>
+</html>
